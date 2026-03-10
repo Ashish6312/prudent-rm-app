@@ -1011,9 +1011,6 @@ function renderHeader(title = '') {
         </div>
       </div>
       <div class="header-right">
-        <div class="header-icon-btn" onclick="handleDownload()" title="Download App">
-          📥
-        </div>
         <div class="header-icon-btn" onclick="navTo('notifications')">
           🔔
           <div class="notif-badge" id="notifBadge" style="display:${unread > 0 ? 'block' : 'none'}"></div>
@@ -1069,42 +1066,4 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2800);
-}
-// Smart download handler
-function handleDownload() {
-  const userAgent = navigator.userAgent.toLowerCase();
-  const isAndroid = userAgent.includes('android');
-  const isIOS = userAgent.includes('iphone') || userAgent.includes('ipad');
-  
-  if (isAndroid) {
-    // Try to download APK, fallback to PWA install
-    fetch('/download-apk')
-      .then(response => {
-        if (response.ok) {
-          window.location.href = '/download-apk';
-          showToast('📥 Downloading APK...');
-        } else {
-          throw new Error('APK not available');
-        }
-      })
-      .catch(() => {
-        showToast('📱 Add to Home Screen for app experience');
-      });
-  } else if (isIOS) {
-    showToast('📱 Tap Share → Add to Home Screen');
-  } else {
-    // Desktop - try APK download or show install option
-    fetch('/download-apk')
-      .then(response => {
-        if (response.ok) {
-          window.open('/download-apk', '_blank');
-          showToast('📥 APK download started');
-        } else {
-          throw new Error('APK not available');
-        }
-      })
-      .catch(() => {
-        showToast('💻 Install as app from browser menu');
-      });
-  }
 }

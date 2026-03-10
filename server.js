@@ -11,16 +11,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// APK download endpoint (placeholder - you'll upload the actual APK)
-app.get('/download-apk', (req, res) => {
-  const apkPath = path.join(__dirname, 'prudent-rm-app.apk');
-  res.download(apkPath, 'PrudentRM.apk', (err) => {
-    if (err) {
-      res.status(404).send('APK file not found. Please build the APK first.');
-    }
-  });
-});
-
 // Manifest
 app.get('/manifest.json', (req, res) => {
   res.sendFile(path.join(__dirname, 'manifest.json'));
