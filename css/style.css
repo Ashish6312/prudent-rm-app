@@ -1727,7 +1727,12 @@ select.form-control option {
   .pwa-install-modal,
   [title="Install App"],
   [onclick*="showPWAInstallModal"],
-  [onclick*="installPWA"] {
+  [onclick*="installPWA"],
+  [data-install],
+  .install-prompt,
+  .pwa-install-prompt,
+  .add-to-homescreen,
+  .browser-install-prompt {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
@@ -1738,9 +1743,51 @@ select.form-control option {
 /* ── iOS standalone mode ── */
 @media (display-mode: standalone) and (-webkit-touch-callout: none) {
   .pwa-download-btn,
-  .pwa-install-modal {
+  .pwa-install-modal,
+  [title="Install App"],
+  [onclick*="install"] {
     display: none !important;
   }
+}
+
+/* ── Hide all install-related elements globally when PWA is detected ── */
+.pwa-mode .pwa-download-btn,
+.pwa-mode .pwa-install-modal,
+.pwa-mode [title="Install App"],
+.pwa-mode [onclick*="showPWAInstallModal"],
+.pwa-mode [onclick*="installPWA"],
+.pwa-mode .install-prompt,
+.pwa-mode .pwa-install-prompt {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ── Hide browser-generated install prompts ── */
+.pwa-mode *[data-install],
+.pwa-mode *[aria-label*="install"],
+.pwa-mode *[aria-label*="Install"],
+.pwa-mode button:contains("Install"),
+.pwa-mode button:contains("📥"),
+.pwa-mode [href*="install"],
+.pwa-mode .chrome-install-prompt,
+.pwa-mode .edge-install-prompt,
+.pwa-mode .firefox-install-prompt,
+.pwa-mode .safari-install-prompt {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ── Global hiding for any install-related content ── */
+body.pwa-mode *:contains("📥"),
+body.pwa-mode *[title*="install"],
+body.pwa-mode *[title*="Install"],
+body.pwa-mode *[alt*="install"],
+body.pwa-mode *[alt*="Install"] {
+  display: none !important;
 }
 
 body.desktop-preview {

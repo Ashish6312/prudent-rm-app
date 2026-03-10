@@ -27,30 +27,43 @@ document.addEventListener('DOMContentLoaded', () => {
 // SESSION MANAGEMENT
 // ══════════════════════════════════════════
 function initSessionManagement() {
-  // Check if user has existing session
-  const savedSession = getSavedSession();
+  console.log('Initializing session management...');
   
-  if (savedSession && isSessionValid(savedSession)) {
-    // Restore user session
-    currentUser = savedSession.user;
-    buildApp();
-    navigateScreen('dashboard');
-    updateNav('dashboard');
-    showToast(`👋 Welcome back, ${currentUser.name.split(' ')[0]}!`);
+  // Wait a bit for PWA detection to stabilize
+  setTimeout(() => {
+    // Check if user has existing session
+    const savedSession = getSavedSession();
     
-    // Setup session management based on app type
-    if (isInstalledPWA()) {
-      // PWA: Keep session indefinitely until manual logout
-      setupPWASession();
+    console.log('Saved session:', savedSession);
+    console.log('PWA detected:', isInstalledPWA());
+    
+    if (savedSession && isSessionValid(savedSession)) {
+      // Restore user session
+      currentUser = savedSession.user;
+      console.log('Restoring session for user:', currentUser.name);
+      
+      buildApp();
+      navigateScreen('dashboard');
+      updateNav('dashboard');
+      showToast(`👋 Welcome back, ${currentUser.name.split(' ')[0]}!`);
+      
+      // Setup session management based on app type
+      if (isInstalledPWA() || savedSession.isPWA) {
+        // PWA: Keep session indefinitely until manual logout
+        setupPWASession();
+        console.log('Setup PWA session management');
+      } else {
+        // Website: Auto-logout on page leave/close
+        setupWebsiteSession();
+        console.log('Setup website session management');
+      }
     } else {
-      // Website: Auto-logout on page leave/close
-      setupWebsiteSession();
+      // No valid session, show login
+      console.log('No valid session found, showing login');
+      clearSession();
+      renderLogin();
     }
-  } else {
-    // No valid session, show login
-    clearSession();
-    renderLogin();
-  }
+  }, 100); // Small delay to ensure PWA detection is complete
 }
 
 function getSavedSession() {
@@ -63,14 +76,21 @@ function getSavedSession() {
 }
 
 function saveSession(user) {
+  const isPWA = isInstalledPWA();
   const sessionData = {
     user: user,
     timestamp: Date.now(),
-    isPWA: isInstalledPWA()
+    isPWA: isPWA,
+    sessionId: Date.now() + '_' + Math.random().toString(36).substr(2, 9)
   };
   
   try {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+    console.log('Session saved:', {
+      user: user.name,
+      isPWA: isPWA,
+      sessionId: sessionData.sessionId
+    });
   } catch (e) {
     console.warn('Could not save session:', e);
   }
@@ -78,12 +98,17 @@ function saveSession(user) {
 
 function isSessionValid(sessionData) {
   if (!sessionData || !sessionData.user || !sessionData.timestamp) {
+    console.log('Session invalid: Missing data');
     return false;
   }
   
+  const isPWA = isInstalledPWA();
+  const wasPWA = sessionData.isPWA;
+  
   // For PWA, session never expires (until manual logout)
-  if (isInstalledPWA()) {
-    // Always valid for PWA, regardless of what was saved
+  // Accept session if either current detection OR saved state indicates PWA
+  if (isPWA || wasPWA) {
+    console.log('Session valid: PWA mode (current:', isPWA, 'saved:', wasPWA, ')');
     return true;
   }
   
@@ -93,7 +118,8 @@ function isSessionValid(sessionData) {
   const isValid = sessionAge < SESSION_TIMEOUT;
   
   console.log('Session validation:', {
-    isPWA: isInstalledPWA(),
+    isPWA: isPWA,
+    wasPWA: wasPWA,
     sessionAge: Math.round(sessionAge / 1000 / 60) + ' minutes',
     timeout: Math.round(SESSION_TIMEOUT / 1000 / 60) + ' minutes',
     valid: isValid
@@ -214,30 +240,87 @@ function initPWAFeatures() {
   // Initialize download button visibility
   initPWADownloadButton();
   
-  // Set up periodic check to ensure PWA elements stay hidden
+  // Set up aggressive periodic check to ensure PWA elements stay hidden
   if (isInstalledPWA()) {
-    setInterval(() => {
+    const hideInstallElements = () => {
+      // Hide main PWA elements
       const downloadBtn = document.getElementById('pwaDownloadBtn');
       const installModal = document.getElementById('pwaInstallModal');
       
-      if (downloadBtn && downloadBtn.style.display !== 'none') {
+      if (downloadBtn) {
         downloadBtn.style.display = 'none !important';
+        downloadBtn.style.visibility = 'hidden !important';
+        downloadBtn.style.opacity = '0 !important';
         downloadBtn.classList.add('hidden-for-pwa');
+        downloadBtn.remove(); // Remove from DOM
       }
       
-      if (installModal && installModal.style.display !== 'none') {
+      if (installModal) {
         installModal.style.display = 'none !important';
+        installModal.style.visibility = 'hidden !important';
+        installModal.style.opacity = '0 !important';
         installModal.classList.add('hide-for-installed');
+        installModal.remove(); // Remove from DOM
       }
       
-      // Hide any install buttons that might appear in headers
-      const installButtons = document.querySelectorAll('[title="Install App"]');
-      installButtons.forEach(btn => {
-        if (btn.textContent.includes('📥')) {
-          btn.style.display = 'none !important';
+      // Hide any install buttons that might appear anywhere
+      const installSelectors = [
+        '[title="Install App"]',
+        '[onclick*="install"]',
+        '[onclick*="Install"]',
+        '[data-install]',
+        '.install-prompt',
+        '.pwa-install-prompt',
+        '.add-to-homescreen',
+        '.browser-install-prompt',
+        '[aria-label*="install"]',
+        '[aria-label*="Install"]',
+        'button:contains("Install")',
+        'button:contains("📥")',
+        '[href*="install"]'
+      ];
+      
+      installSelectors.forEach(selector => {
+        try {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(el => {
+            const text = el.textContent || el.innerText || '';
+            const title = el.title || '';
+            const ariaLabel = el.getAttribute('aria-label') || '';
+            
+            if (text.includes('📥') || 
+                text.toLowerCase().includes('install') ||
+                title.toLowerCase().includes('install') ||
+                ariaLabel.toLowerCase().includes('install')) {
+              el.style.display = 'none !important';
+              el.style.visibility = 'hidden !important';
+              el.style.opacity = '0 !important';
+              el.style.pointerEvents = 'none !important';
+              el.remove(); // Remove from DOM
+            }
+          });
+        } catch (e) {
+          // Ignore selector errors
         }
       });
-    }, 2000); // Check every 2 seconds
+      
+      // Ensure body has PWA mode class
+      document.body.classList.add('pwa-mode');
+      document.documentElement.classList.add('pwa-mode');
+    };
+    
+    // Run immediately and then every second
+    hideInstallElements();
+    setInterval(hideInstallElements, 1000);
+    
+    // Also run on DOM mutations
+    const observer = new MutationObserver(hideInstallElements);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class']
+    });
   }
   
   // Handle app shortcuts
@@ -1415,6 +1498,9 @@ function isInstalledPWA() {
   // Test mode override
   if (window.testPWAMode) return true;
   
+  // Check localStorage for previous PWA detection (fallback)
+  const previousPWAState = localStorage.getItem('prudent_rm_is_pwa');
+  
   // Multiple detection methods for better accuracy
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   const isIOSStandalone = window.navigator.standalone === true;
@@ -1426,18 +1512,34 @@ function isInstalledPWA() {
   const isTWA = window.location.search.includes('utm_source=homescreen') || 
                 window.location.search.includes('source=pwa');
   
-  const detected = isStandalone || isIOSStandalone || isAndroidApp || isWindowsApp || hasAppInstalled || isTWA;
+  // Check for PWA-specific features
+  const hasServiceWorker = 'serviceWorker' in navigator;
+  const hasManifest = document.querySelector('link[rel="manifest"]');
+  const isMinimalUI = window.matchMedia('(display-mode: minimal-ui)').matches;
   
-  // Debug logging (remove in production)
+  // Additional checks for mobile browsers
+  const isMobileStandalone = window.screen.height === window.innerHeight;
+  const hasNoAddressBar = window.outerHeight === window.innerHeight;
+  
+  const detected = isStandalone || isIOSStandalone || isAndroidApp || isWindowsApp || 
+                   hasAppInstalled || isTWA || isMinimalUI;
+  
+  // If detected as PWA, save state for future reference
   if (detected) {
+    localStorage.setItem('prudent_rm_is_pwa', 'true');
     console.log('PWA Detected:', {
       standalone: isStandalone,
       iOS: isIOSStandalone, 
       android: isAndroidApp,
       windows: isWindowsApp,
       fullscreen: hasAppInstalled,
-      twa: isTWA
+      twa: isTWA,
+      minimalUI: isMinimalUI
     });
+  } else if (previousPWAState === 'true') {
+    // Fallback: if previously detected as PWA, assume still PWA
+    console.log('PWA Detection fallback: Using previous state');
+    return true;
   }
   
   return detected;
@@ -1452,29 +1554,67 @@ function initPWADownloadButton() {
   console.log('Initializing PWA buttons - isPWA:', isPWA);
   
   if (isPWA) {
+    // Add PWA mode class to body for CSS targeting
+    document.body.classList.add('pwa-mode');
+    document.documentElement.classList.add('pwa-mode');
+    
     // App is installed - hide all download/install UI completely
     if (downloadBtn) {
       downloadBtn.style.display = 'none !important';
       downloadBtn.classList.remove('show-for-website');
       downloadBtn.classList.add('hidden-for-pwa');
-      console.log('Hidden download button for PWA');
+      downloadBtn.remove(); // Completely remove from DOM
+      console.log('Hidden and removed download button for PWA');
     }
     if (installModal) {
       installModal.style.display = 'none !important';
       installModal.classList.add('hide-for-installed');
-      console.log('Hidden install modal for PWA');
+      installModal.remove(); // Completely remove from DOM
+      console.log('Hidden and removed install modal for PWA');
     }
     
-    // Also hide any other install-related elements
-    const installButtons = document.querySelectorAll('[title="Install App"], [onclick*="showPWAInstallModal"], [onclick*="installPWA"]');
-    installButtons.forEach(btn => {
-      if (btn.textContent.includes('📥') || btn.title === 'Install App') {
-        btn.style.display = 'none !important';
-        console.log('Hidden install button:', btn);
-      }
+    // Hide any other install-related elements
+    const installSelectors = [
+      '[title="Install App"]',
+      '[onclick*="showPWAInstallModal"]',
+      '[onclick*="installPWA"]',
+      '[data-install]',
+      '.install-prompt',
+      '.pwa-install-prompt',
+      '.add-to-homescreen',
+      '.browser-install-prompt',
+      '[aria-label*="install"]',
+      '[aria-label*="Install"]'
+    ];
+    
+    installSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (el.textContent.includes('📥') || 
+            el.title === 'Install App' || 
+            el.getAttribute('onclick')?.includes('install')) {
+          el.style.display = 'none !important';
+          el.style.visibility = 'hidden !important';
+          el.style.opacity = '0 !important';
+          el.style.pointerEvents = 'none !important';
+          el.remove(); // Remove from DOM
+          console.log('Hidden install element:', el);
+        }
+      });
+    });
+    
+    // Prevent browser install prompts
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
     });
     
   } else {
+    // Remove PWA mode class
+    document.body.classList.remove('pwa-mode');
+    document.documentElement.classList.remove('pwa-mode');
+    
     // App is running in browser - show download button
     if (downloadBtn) {
       downloadBtn.style.display = '';
@@ -1531,12 +1671,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 // Check if already installed
 window.addEventListener('appinstalled', () => {
+  // Mark as PWA in localStorage for future reference
+  localStorage.setItem('prudent_rm_is_pwa', 'true');
+  
   const downloadBtn = document.getElementById('pwaDownloadBtn');
   if (downloadBtn) {
     downloadBtn.style.display = 'none';
     downloadBtn.classList.remove('show-for-website');
   }
   showToast('🎉 App installed successfully!');
+  
+  // Re-initialize PWA features
+  setTimeout(() => {
+    initPWADownloadButton();
+  }, 1000);
 });
 
 function showPWAInstallModal() {
