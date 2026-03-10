@@ -2007,7 +2007,7 @@ body.desktop-preview {
 }
 
 
-/* ── PWA Download Button ── */
+/* ── PWA Download Button (Only for website, hidden when installed) ── */
 .pwa-download-btn {
   position: fixed;
   top: 20px;
@@ -2017,7 +2017,7 @@ body.desktop-preview {
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gold), #F97316);
   box-shadow: 0 8px 24px rgba(245, 166, 35, 0.5);
-  display: flex;
+  display: none; /* Hidden by default */
   align-items: center;
   justify-content: center;
   font-size: 24px;
@@ -2026,6 +2026,11 @@ body.desktop-preview {
   transition: all var(--transition);
   animation: download-pulse 2s ease-in-out infinite;
   border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Only show download button when NOT installed as PWA */
+.pwa-download-btn.show-for-website {
+  display: flex;
 }
 
 .pwa-download-btn:hover {
@@ -2070,7 +2075,7 @@ body.desktop-preview {
   opacity: 1;
 }
 
-/* ── PWA Install Modal ── */
+/* ── PWA Install Modal (Only for website, hidden when installed) ── */
 .pwa-install-modal {
   position: fixed;
   inset: 0;
@@ -2089,6 +2094,11 @@ body.desktop-preview {
 .pwa-install-modal.active {
   opacity: 1;
   pointer-events: all;
+}
+
+/* Hide modal completely when app is installed */
+.pwa-install-modal.hide-for-installed {
+  display: none !important;
 }
 
 .pwa-install-content {

@@ -11,12 +11,174 @@ let activeDateRange = 'This Month';
 let taskFilter = 'Pending';
 let prefilledCP = null;
 
+// Session management constants
+const SESSION_STORAGE_KEY = 'prudent_rm_session';
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes for website
+let sessionTimer = null;
+
 // ── DOM Ready ─────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  renderLogin();
+  initSessionManagement();
   registerSW();
   initPWAFeatures();
 });
+
+// ══════════════════════════════════════════
+// SESSION MANAGEMENT
+// ══════════════════════════════════════════
+function initSessionManagement() {
+  // Check if user has existing session
+  const savedSession = getSavedSession();
+  
+  if (savedSession && isSessionValid(savedSession)) {
+    // Restore user session
+    currentUser = savedSession.user;
+    buildApp();
+    navigateScreen('dashboard');
+    updateNav('dashboard');
+    showToast(`👋 Welcome back, ${currentUser.name.split(' ')[0]}!`);
+    
+    // Setup session management based on app type
+    if (isInstalledPWA()) {
+      // PWA: Keep session indefinitely until manual logout
+      setupPWASession();
+    } else {
+      // Website: Auto-logout on page leave/close
+      setupWebsiteSession();
+    }
+  } else {
+    // No valid session, show login
+    clearSession();
+    renderLogin();
+  }
+}
+
+function getSavedSession() {
+  try {
+    const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
+    return sessionData ? JSON.parse(sessionData) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveSession(user) {
+  const sessionData = {
+    user: user,
+    timestamp: Date.now(),
+    isPWA: isInstalledPWA()
+  };
+  
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+  } catch (e) {
+    console.warn('Could not save session:', e);
+  }
+}
+
+function isSessionValid(sessionData) {
+  if (!sessionData || !sessionData.user || !sessionData.timestamp) {
+    return false;
+  }
+  
+  // For PWA, session never expires (until manual logout)
+  if (isInstalledPWA() && sessionData.isPWA) {
+    return true;
+  }
+  
+  // For website, check if session is within timeout period
+  const now = Date.now();
+  const sessionAge = now - sessionData.timestamp;
+  return sessionAge < SESSION_TIMEOUT;
+}
+
+function clearSession() {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch (e) {
+    console.warn('Could not clear session:', e);
+  }
+  
+  if (sessionTimer) {
+    clearTimeout(sessionTimer);
+    sessionTimer = null;
+  }
+}
+
+function setupPWASession() {
+  // PWA: Update session timestamp periodically to keep it fresh
+  // But don't auto-logout - only manual logout
+  setInterval(() => {
+    if (currentUser) {
+      saveSession(currentUser);
+    }
+  }, 5 * 60 * 1000); // Update every 5 minutes
+  
+  console.log('PWA Session: Persistent login enabled');
+}
+
+function setupWebsiteSession() {
+  // Website: Auto-logout on page leave/close and inactivity
+  
+  // Auto-logout on page unload (close/refresh/navigate away)
+  window.addEventListener('beforeunload', () => {
+    if (currentUser) {
+      clearSession();
+    }
+  });
+  
+  // Auto-logout on page visibility change (tab switch/minimize)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && currentUser) {
+      // Start logout timer when page becomes hidden
+      sessionTimer = setTimeout(() => {
+        if (currentUser) {
+          autoLogout('Session expired due to inactivity');
+        }
+      }, 10 * 60 * 1000); // 10 minutes after hiding
+    } else if (!document.hidden && sessionTimer) {
+      // Cancel logout timer when page becomes visible again
+      clearTimeout(sessionTimer);
+      sessionTimer = null;
+      
+      // Refresh session timestamp
+      if (currentUser) {
+        saveSession(currentUser);
+      }
+    }
+  });
+  
+  // Auto-logout on inactivity
+  let inactivityTimer = null;
+  const resetInactivityTimer = () => {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    
+    if (currentUser && !isInstalledPWA()) {
+      inactivityTimer = setTimeout(() => {
+        autoLogout('Session expired due to inactivity');
+      }, SESSION_TIMEOUT);
+    }
+  };
+  
+  // Reset timer on user activity
+  ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+    document.addEventListener(event, resetInactivityTimer, true);
+  });
+  
+  // Start inactivity timer
+  resetInactivityTimer();
+  
+  console.log('Website Session: Auto-logout enabled');
+}
+
+function autoLogout(reason) {
+  if (currentUser) {
+    currentUser = null;
+    clearSession();
+    navigateScreen('login');
+    showToast(`🔒 ${reason}`);
+  }
+}
 
 function registerSW() {
   if ('serviceWorker' in navigator) {
@@ -39,6 +201,9 @@ function registerSW() {
 }
 
 function initPWAFeatures() {
+  // Initialize download button visibility
+  initPWADownloadButton();
+  
   // Handle app shortcuts
   const urlParams = new URLSearchParams(window.location.search);
   const shortcut = urlParams.get('shortcut');
@@ -58,8 +223,8 @@ function initPWAFeatures() {
     showToast('📴 You\'re offline - app will continue to work');
   });
   
-  // Request notification permission
-  if ('Notification' in window && Notification.permission === 'default') {
+  // Request notification permission (only if not installed)
+  if ('Notification' in window && Notification.permission === 'default' && !isInstalledPWA()) {
     setTimeout(() => {
       Notification.requestPermission().then(permission => {
         if (permission === 'granted') {
@@ -116,6 +281,27 @@ function updateNav(screen) {
 // ══════════════════════════════════════════
 function renderLogin() {
   navigateScreen('login');
+  
+  // Add session type indicator to login form
+  setTimeout(() => {
+    const loginForm = document.querySelector('.login-form');
+    if (loginForm && !loginForm.querySelector('.session-indicator')) {
+      const sessionType = isInstalledPWA() ? 'App Mode: Stay logged in' : 'Website Mode: Auto-logout on close';
+      const sessionIcon = isInstalledPWA() ? '📱' : '🌐';
+      const sessionColor = isInstalledPWA() ? 'var(--green)' : 'var(--gold)';
+      
+      const indicator = document.createElement('div');
+      indicator.className = 'session-indicator';
+      indicator.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;margin-bottom:16px;font-size:12px;color:${sessionColor}">
+          <span>${sessionIcon}</span>
+          <span>${sessionType}</span>
+        </div>
+      `;
+      
+      loginForm.insertBefore(indicator, loginForm.querySelector('.form-group'));
+    }
+  }, 100);
 }
 
 function doLogin() {
@@ -133,10 +319,23 @@ function doLogin() {
   }
 
   currentUser = user;
+  
+  // Save session based on app type
+  saveSession(user);
+  
+  // Setup session management
+  if (isInstalledPWA()) {
+    setupPWASession();
+  } else {
+    setupWebsiteSession();
+  }
+  
   buildApp();
   navigateScreen('dashboard');
   updateNav('dashboard');
-  showToast(`👋 Welcome, ${user.name.split(' ')[0]}!`);
+  
+  const appType = isInstalledPWA() ? 'app' : 'website';
+  showToast(`👋 Welcome, ${user.name.split(' ')[0]}! (${appType})`);
 }
 
 // ══════════════════════════════════════════
@@ -980,6 +1179,9 @@ function renderAbout() {
 // ══════════════════════════════════════════
 function renderProfile() {
   const u = currentUser;
+  const sessionType = isInstalledPWA() ? 'App (Persistent Login)' : 'Website (Auto-logout)';
+  const sessionIcon = isInstalledPWA() ? '📱' : '🌐';
+  
   const el = document.getElementById('screen-profile');
   el.innerHTML = `
     ${renderHeader('My Profile')}
@@ -992,6 +1194,10 @@ function renderProfile() {
       </div>
 
       <div class="profile-info-list">
+        <div class="profile-info-item">
+          <span class="pi-label">${sessionIcon} Session Type</span>
+          <span class="pi-value" style="font-size:13px">${sessionType}</span>
+        </div>
         <div class="profile-info-item"><span class="pi-label">🗺️ Zone</span><span class="pi-value">${u.zone}</span></div>
         <div class="profile-info-item"><span class="pi-label">📌 Region</span><span class="pi-value">${u.region}</span></div>
         <div class="profile-info-item"><span class="pi-label">🏘️ Cluster</span><span class="pi-value">${u.cluster}</span></div>
@@ -1005,6 +1211,16 @@ function renderProfile() {
       </div>
 
       <button class="logout-btn" onclick="doLogout()">🚪 Logout</button>
+      
+      ${!isInstalledPWA() ? `
+        <div style="margin:16px 20px 0;padding:12px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);font-size:12px;color:var(--gold);text-align:center">
+          🌐 Website Mode: You'll be automatically logged out when you close this tab or after 30 minutes of inactivity
+        </div>
+      ` : `
+        <div style="margin:16px 20px 0;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius-sm);font-size:12px;color:var(--green);text-align:center">
+          📱 App Mode: You'll stay logged in until you manually logout
+        </div>
+      `}
     </div>
     ${renderBottomNav()}
   `;
@@ -1012,8 +1228,11 @@ function renderProfile() {
 
 function doLogout() {
   currentUser = null;
+  clearSession();
   navigateScreen('login');
-  showToast('👋 Logged out successfully');
+  
+  const appType = isInstalledPWA() ? 'app' : 'website';
+  showToast(`👋 Logged out successfully (${appType})`);
 }
 
 // ══════════════════════════════════════════
@@ -1047,7 +1266,7 @@ function renderHeader(title = '') {
   const u = currentUser;
   if (!u) return '';
   const unread = APP_DATA.notifications.filter(n => !n.read).length;
-  const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+  const isInstalled = isInstalledPWA();
   
   return `
     <div class="app-header">
@@ -1128,23 +1347,57 @@ function showToast(msg) {
 let deferredPrompt;
 let pwaInstallShown = false;
 
+// Check if app is running as installed PWA
+function isInstalledPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         window.navigator.standalone === true || 
+         document.referrer.includes('android-app://');
+}
+
+// Initialize PWA download button visibility
+function initPWADownloadButton() {
+  const downloadBtn = document.getElementById('pwaDownloadBtn');
+  const installModal = document.getElementById('pwaInstallModal');
+  
+  if (isInstalledPWA()) {
+    // App is installed - hide all download/install UI completely
+    if (downloadBtn) {
+      downloadBtn.style.display = 'none';
+      downloadBtn.classList.remove('show-for-website');
+    }
+    if (installModal) {
+      installModal.classList.add('hide-for-installed');
+    }
+  } else {
+    // App is running in browser - show download button
+    if (downloadBtn) {
+      downloadBtn.classList.add('show-for-website');
+    }
+    if (installModal) {
+      installModal.classList.remove('hide-for-installed');
+    }
+  }
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
   
-  // Show the download button
-  const downloadBtn = document.getElementById('pwaDownloadBtn');
-  if (downloadBtn) {
-    downloadBtn.style.display = 'flex';
-  }
-  
-  // Auto-show install modal after 10 seconds if not installed
-  setTimeout(() => {
-    if (!pwaInstallShown && !window.matchMedia('(display-mode: standalone)').matches) {
-      showPWAInstallModal();
-      pwaInstallShown = true;
+  // Only show download features if not already installed
+  if (!isInstalledPWA()) {
+    const downloadBtn = document.getElementById('pwaDownloadBtn');
+    if (downloadBtn) {
+      downloadBtn.classList.add('show-for-website');
     }
-  }, 10000);
+    
+    // Auto-show install modal after 10 seconds if not installed
+    setTimeout(() => {
+      if (!pwaInstallShown && !isInstalledPWA()) {
+        showPWAInstallModal();
+        pwaInstallShown = true;
+      }
+    }, 10000);
+  }
 });
 
 // Check if already installed
@@ -1152,21 +1405,15 @@ window.addEventListener('appinstalled', () => {
   const downloadBtn = document.getElementById('pwaDownloadBtn');
   if (downloadBtn) {
     downloadBtn.style.display = 'none';
+    downloadBtn.classList.remove('show-for-website');
   }
   showToast('🎉 App installed successfully!');
 });
 
-// Hide download button if already running as PWA
-if (window.matchMedia('(display-mode: standalone)').matches) {
-  document.addEventListener('DOMContentLoaded', () => {
-    const downloadBtn = document.getElementById('pwaDownloadBtn');
-    if (downloadBtn) {
-      downloadBtn.style.display = 'none';
-    }
-  });
-}
-
 function showPWAInstallModal() {
+  // Only show modal if not installed
+  if (isInstalledPWA()) return;
+  
   const modal = document.getElementById('pwaInstallModal');
   if (modal) {
     modal.classList.add('active');
@@ -1215,5 +1462,8 @@ function installPWAFromModal() {
 }
 
 function installPWA() {
-  showPWAInstallModal();
+  // Only show install modal if not already installed
+  if (!isInstalledPWA()) {
+    showPWAInstallModal();
+  }
 }
