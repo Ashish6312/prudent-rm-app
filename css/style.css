@@ -1721,6 +1721,28 @@ select.form-control option {
   }
 }
 
+/* ── Hide PWA install elements when running in standalone mode ── */
+@media (display-mode: standalone) {
+  .pwa-download-btn,
+  .pwa-install-modal,
+  [title="Install App"],
+  [onclick*="showPWAInstallModal"],
+  [onclick*="installPWA"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
+/* ── iOS standalone mode ── */
+@media (display-mode: standalone) and (-webkit-touch-callout: none) {
+  .pwa-download-btn,
+  .pwa-install-modal {
+    display: none !important;
+  }
+}
+
 body.desktop-preview {
   background: #050d1a;
   display: flex;
@@ -2033,6 +2055,14 @@ body.desktop-preview {
   display: flex;
 }
 
+/* Force hide when PWA is installed */
+.pwa-download-btn.hidden-for-pwa {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .pwa-download-btn:hover {
   transform: scale(1.1);
   box-shadow: 0 12px 32px rgba(245, 166, 35, 0.7);
@@ -2099,6 +2129,9 @@ body.desktop-preview {
 /* Hide modal completely when app is installed */
 .pwa-install-modal.hide-for-installed {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .pwa-install-content {

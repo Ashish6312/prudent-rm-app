@@ -214,6 +214,32 @@ function initPWAFeatures() {
   // Initialize download button visibility
   initPWADownloadButton();
   
+  // Set up periodic check to ensure PWA elements stay hidden
+  if (isInstalledPWA()) {
+    setInterval(() => {
+      const downloadBtn = document.getElementById('pwaDownloadBtn');
+      const installModal = document.getElementById('pwaInstallModal');
+      
+      if (downloadBtn && downloadBtn.style.display !== 'none') {
+        downloadBtn.style.display = 'none !important';
+        downloadBtn.classList.add('hidden-for-pwa');
+      }
+      
+      if (installModal && installModal.style.display !== 'none') {
+        installModal.style.display = 'none !important';
+        installModal.classList.add('hide-for-installed');
+      }
+      
+      // Hide any install buttons that might appear in headers
+      const installButtons = document.querySelectorAll('[title="Install App"]');
+      installButtons.forEach(btn => {
+        if (btn.textContent.includes('📥')) {
+          btn.style.display = 'none !important';
+        }
+      });
+    }, 2000); // Check every 2 seconds
+  }
+  
   // Handle app shortcuts
   const urlParams = new URLSearchParams(window.location.search);
   const shortcut = urlParams.get('shortcut');
@@ -1428,21 +1454,36 @@ function initPWADownloadButton() {
   if (isPWA) {
     // App is installed - hide all download/install UI completely
     if (downloadBtn) {
-      downloadBtn.style.display = 'none';
+      downloadBtn.style.display = 'none !important';
       downloadBtn.classList.remove('show-for-website');
+      downloadBtn.classList.add('hidden-for-pwa');
       console.log('Hidden download button for PWA');
     }
     if (installModal) {
+      installModal.style.display = 'none !important';
       installModal.classList.add('hide-for-installed');
       console.log('Hidden install modal for PWA');
     }
+    
+    // Also hide any other install-related elements
+    const installButtons = document.querySelectorAll('[title="Install App"], [onclick*="showPWAInstallModal"], [onclick*="installPWA"]');
+    installButtons.forEach(btn => {
+      if (btn.textContent.includes('📥') || btn.title === 'Install App') {
+        btn.style.display = 'none !important';
+        console.log('Hidden install button:', btn);
+      }
+    });
+    
   } else {
     // App is running in browser - show download button
     if (downloadBtn) {
+      downloadBtn.style.display = '';
       downloadBtn.classList.add('show-for-website');
+      downloadBtn.classList.remove('hidden-for-pwa');
       console.log('Showing download button for website');
     }
     if (installModal) {
+      installModal.style.display = '';
       installModal.classList.remove('hide-for-installed');
       console.log('Showing install modal for website');
     }
@@ -1450,21 +1491,20 @@ function initPWADownloadButton() {
   
   // Force header re-render to update button visibility
   if (currentUser) {
-    const headerElements = document.querySelectorAll('.app-header');
-    headerElements.forEach(header => {
-      if (header.parentElement) {
-        const screenId = header.parentElement.id.replace('screen-', '');
-        if (screenId && typeof window[`render${screenId.charAt(0).toUpperCase() + screenId.slice(1)}`] === 'function') {
-          // Re-render the current screen to update header
-          setTimeout(() => {
-            if (currentScreen === screenId.replace('screen-', '')) {
-              const renderFunction = window[`render${screenId.charAt(0).toUpperCase() + screenId.slice(1)}`];
-              if (renderFunction) renderFunction();
-            }
-          }, 100);
-        }
-      }
-    });
+    setTimeout(() => {
+      // Re-render all screens to update headers
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderCPList === 'function') renderCPList();
+      if (typeof renderReports === 'function') renderReports();
+      if (typeof renderHierarchy === 'function') renderHierarchy();
+      if (typeof renderCallLog === 'function') renderCallLog();
+      if (typeof renderNotifications === 'function') renderNotifications();
+      if (typeof renderProfile === 'function') renderProfile();
+      if (typeof renderTasks === 'function') renderTasks();
+      
+      // Navigate to current screen to refresh
+      navigateScreen(currentScreen);
+    }, 200);
   }
 }
 
