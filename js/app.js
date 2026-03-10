@@ -1010,6 +1010,9 @@ function renderHeader(title = '') {
         </div>
       </div>
       <div class="header-right">
+        <div class="header-icon-btn" onclick="window.open('https://prudent-rm-app.onrender.com', '_blank')" title="Share App">
+          📤
+        </div>
         <div class="header-icon-btn" onclick="navTo('notifications')">
           🔔
           <div class="notif-badge" id="notifBadge" style="display:${unread > 0 ? 'block' : 'none'}"></div>
@@ -1065,4 +1068,39 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// PWA Install functionality
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  
+  // Show install button in header
+  const installBtn = document.createElement('div');
+  installBtn.className = 'header-icon-btn';
+  installBtn.innerHTML = '📥';
+  installBtn.title = 'Install App';
+  installBtn.onclick = installPWA;
+  
+  const headerRight = document.querySelector('.header-right');
+  if (headerRight) {
+    headerRight.insertBefore(installBtn, headerRight.firstChild);
+  }
+});
+
+function installPWA() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        showToast('📱 App installed successfully!');
+      }
+      deferredPrompt = null;
+    });
+  } else {
+    // Fallback for browsers that don't support install prompt
+    showToast('📱 Add to Home Screen from browser menu');
+  }
 }
