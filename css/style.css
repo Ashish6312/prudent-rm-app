@@ -117,30 +117,62 @@ body {
 }
 
 .login-logo-circle {
-  width: 80px;
-  height: 80px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gold), #F97316);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
+  font-size: 42px;
   font-weight: 800;
   color: var(--navy);
   box-shadow: 0 0 40px rgba(245, 166, 35, 0.5);
   margin-bottom: 16px;
-  animation: pulse-glow 3s ease-in-out infinite;
+  animation: logo-bounce 2s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
 }
 
-@keyframes pulse-glow {
+.login-logo-circle::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: logo-shine 3s ease-in-out infinite;
+}
 
-  0%,
-  100% {
+@keyframes logo-bounce {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
     box-shadow: 0 0 30px rgba(245, 166, 35, 0.4);
   }
-
+  25% {
+    transform: scale(1.05) rotate(-2deg);
+    box-shadow: 0 0 50px rgba(245, 166, 35, 0.6);
+  }
   50% {
-    box-shadow: 0 0 60px rgba(245, 166, 35, 0.7);
+    transform: scale(1.1) rotate(0deg);
+    box-shadow: 0 0 60px rgba(245, 166, 35, 0.8);
+  }
+  75% {
+    transform: scale(1.05) rotate(2deg);
+    box-shadow: 0 0 50px rgba(245, 166, 35, 0.6);
+  }
+}
+
+@keyframes logo-shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  50% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(200%) translateY(200%) rotate(45deg);
   }
 }
 
@@ -1974,6 +2006,200 @@ body.desktop-preview {
   margin-top: 6px;
 }
 
+
+/* ── PWA Download Button ── */
+.pwa-download-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), #F97316);
+  box-shadow: 0 8px 24px rgba(245, 166, 35, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 150;
+  transition: all var(--transition);
+  animation: download-pulse 2s ease-in-out infinite;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.pwa-download-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 32px rgba(245, 166, 35, 0.7);
+}
+
+.pwa-download-btn:active {
+  transform: scale(0.95);
+}
+
+@keyframes download-pulse {
+  0%, 100% {
+    box-shadow: 0 8px 24px rgba(245, 166, 35, 0.5);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 12px 32px rgba(245, 166, 35, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+.pwa-download-tooltip {
+  position: absolute;
+  bottom: -45px;
+  right: 0;
+  background: var(--navy-2);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+  z-index: 151;
+}
+
+.pwa-download-btn:hover .pwa-download-tooltip {
+  opacity: 1;
+}
+
+/* ── PWA Install Modal ── */
+.pwa-install-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+  padding: 20px;
+}
+
+.pwa-install-modal.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.pwa-install-content {
+  background: var(--navy-2);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 32px 24px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  transform: scale(0.9);
+  transition: transform var(--transition);
+}
+
+.pwa-install-modal.active .pwa-install-content {
+  transform: scale(1);
+}
+
+.pwa-install-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--gold), #F97316);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0 auto 20px;
+  animation: logo-bounce 2s ease-in-out infinite;
+}
+
+.pwa-install-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.pwa-install-subtitle {
+  font-size: 14px;
+  color: var(--text-3);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.pwa-install-features {
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+.pwa-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.pwa-feature-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(245, 166, 35, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.pwa-install-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.pwa-btn-primary {
+  flex: 1;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, var(--gold), #F97316);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--navy);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: transform var(--transition);
+}
+
+.pwa-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.pwa-btn-secondary {
+  flex: 1;
+  padding: 14px 20px;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all var(--transition);
+}
+
+.pwa-btn-secondary:active {
+  transform: scale(0.98);
+}
 
 /* Remove all APK download link styles */
 

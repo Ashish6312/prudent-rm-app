@@ -15,11 +15,58 @@ let prefilledCP = null;
 document.addEventListener('DOMContentLoaded', () => {
   renderLogin();
   registerSW();
+  initPWAFeatures();
 });
 
 function registerSW() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => { });
+    navigator.serviceWorker.register('./sw.js')
+      .then(registration => {
+        console.log('SW registered:', registration);
+        
+        // Check for updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showToast('🔄 App updated! Refresh to see changes');
+            }
+          });
+        });
+      })
+      .catch(error => console.log('SW registration failed:', error));
+  }
+}
+
+function initPWAFeatures() {
+  // Handle app shortcuts
+  const urlParams = new URLSearchParams(window.location.search);
+  const shortcut = urlParams.get('shortcut');
+  
+  if (shortcut && currentUser) {
+    setTimeout(() => {
+      navTo(shortcut);
+    }, 1000);
+  }
+  
+  // Handle online/offline status
+  window.addEventListener('online', () => {
+    showToast('🌐 Back online!');
+  });
+  
+  window.addEventListener('offline', () => {
+    showToast('📴 You\'re offline - app will continue to work');
+  });
+  
+  // Request notification permission
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          showToast('🔔 Notifications enabled');
+        }
+      });
+    }, 5000);
   }
 }
 
@@ -1000,6 +1047,8 @@ function renderHeader(title = '') {
   const u = currentUser;
   if (!u) return '';
   const unread = APP_DATA.notifications.filter(n => !n.read).length;
+  const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+  
   return `
     <div class="app-header">
       <div class="header-left">
@@ -1010,6 +1059,11 @@ function renderHeader(title = '') {
         </div>
       </div>
       <div class="header-right">
+        ${!isInstalled ? `
+          <div class="header-icon-btn" onclick="showPWAInstallModal()" title="Install App">
+            📥
+          </div>
+        ` : ''}
         <div class="header-icon-btn" onclick="window.open('https://prudent-rm-app.onrender.com', '_blank')" title="Share App">
           📤
         </div>
@@ -1072,35 +1126,94 @@ function showToast(msg) {
 
 // PWA Install functionality
 let deferredPrompt;
+let pwaInstallShown = false;
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
   
-  // Show install button in header
-  const installBtn = document.createElement('div');
-  installBtn.className = 'header-icon-btn';
-  installBtn.innerHTML = '📥';
-  installBtn.title = 'Install App';
-  installBtn.onclick = installPWA;
-  
-  const headerRight = document.querySelector('.header-right');
-  if (headerRight) {
-    headerRight.insertBefore(installBtn, headerRight.firstChild);
+  // Show the download button
+  const downloadBtn = document.getElementById('pwaDownloadBtn');
+  if (downloadBtn) {
+    downloadBtn.style.display = 'flex';
   }
+  
+  // Auto-show install modal after 10 seconds if not installed
+  setTimeout(() => {
+    if (!pwaInstallShown && !window.matchMedia('(display-mode: standalone)').matches) {
+      showPWAInstallModal();
+      pwaInstallShown = true;
+    }
+  }, 10000);
 });
 
-function installPWA() {
+// Check if already installed
+window.addEventListener('appinstalled', () => {
+  const downloadBtn = document.getElementById('pwaDownloadBtn');
+  if (downloadBtn) {
+    downloadBtn.style.display = 'none';
+  }
+  showToast('🎉 App installed successfully!');
+});
+
+// Hide download button if already running as PWA
+if (window.matchMedia('(display-mode: standalone)').matches) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const downloadBtn = document.getElementById('pwaDownloadBtn');
+    if (downloadBtn) {
+      downloadBtn.style.display = 'none';
+    }
+  });
+}
+
+function showPWAInstallModal() {
+  const modal = document.getElementById('pwaInstallModal');
+  if (modal) {
+    modal.classList.add('active');
+  }
+}
+
+function closePWAInstallModal() {
+  const modal = document.getElementById('pwaInstallModal');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+}
+
+function installPWAFromModal() {
   if (deferredPrompt) {
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then((choiceResult) => {
       if (choiceResult.outcome === 'accepted') {
-        showToast('📱 App installed successfully!');
+        showToast('📱 Installing app...');
+        closePWAInstallModal();
+      } else {
+        showToast('📱 Installation cancelled');
       }
       deferredPrompt = null;
     });
   } else {
-    // Fallback for browsers that don't support install prompt
-    showToast('📱 Add to Home Screen from browser menu');
+    // Fallback instructions for different browsers
+    const userAgent = navigator.userAgent.toLowerCase();
+    let instructions = '';
+    
+    if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+      instructions = '1. Tap the menu (⋮) in Chrome\n2. Select "Add to Home screen"\n3. Tap "Add"';
+    } else if (userAgent.includes('safari')) {
+      instructions = '1. Tap the Share button (□↗)\n2. Select "Add to Home Screen"\n3. Tap "Add"';
+    } else if (userAgent.includes('firefox')) {
+      instructions = '1. Tap the menu (⋮) in Firefox\n2. Select "Install"\n3. Tap "Add to Home screen"';
+    } else if (userAgent.includes('edg')) {
+      instructions = '1. Tap the menu (⋯) in Edge\n2. Select "Add to phone"\n3. Tap "Add"';
+    } else {
+      instructions = 'Look for "Add to Home Screen" or "Install" in your browser menu';
+    }
+    
+    alert(`To install this app:\n\n${instructions}`);
+    closePWAInstallModal();
   }
+}
+
+function installPWA() {
+  showPWAInstallModal();
 }
