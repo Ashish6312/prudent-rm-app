@@ -1282,10 +1282,10 @@ function renderHeader(title = '') {
           <div class="header-icon-btn" onclick="showPWAInstallModal()" title="Install App">
             📥
           </div>
+          <div class="header-icon-btn" onclick="window.open('https://prudent-rm-app.onrender.com', '_blank')" title="Share App">
+            📤
+          </div>
         ` : ''}
-        <div class="header-icon-btn" onclick="window.open('https://prudent-rm-app.onrender.com', '_blank')" title="Share App">
-          📤
-        </div>
         <div class="header-icon-btn" onclick="navTo('notifications')">
           🔔
           <div class="notif-badge" id="notifBadge" style="display:${unread > 0 ? 'block' : 'none'}"></div>
