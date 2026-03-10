@@ -82,14 +82,24 @@ function isSessionValid(sessionData) {
   }
   
   // For PWA, session never expires (until manual logout)
-  if (isInstalledPWA() && sessionData.isPWA) {
+  if (isInstalledPWA()) {
+    // Always valid for PWA, regardless of what was saved
     return true;
   }
   
   // For website, check if session is within timeout period
   const now = Date.now();
   const sessionAge = now - sessionData.timestamp;
-  return sessionAge < SESSION_TIMEOUT;
+  const isValid = sessionAge < SESSION_TIMEOUT;
+  
+  console.log('Session validation:', {
+    isPWA: isInstalledPWA(),
+    sessionAge: Math.round(sessionAge / 1000 / 60) + ' minutes',
+    timeout: Math.round(SESSION_TIMEOUT / 1000 / 60) + ' minutes',
+    valid: isValid
+  });
+  
+  return isValid;
 }
 
 function clearSession() {
@@ -1181,6 +1191,7 @@ function renderProfile() {
   const u = currentUser;
   const sessionType = isInstalledPWA() ? 'App (Persistent Login)' : 'Website (Auto-logout)';
   const sessionIcon = isInstalledPWA() ? '📱' : '🌐';
+  const isPWA = isInstalledPWA();
   
   const el = document.getElementById('screen-profile');
   el.innerHTML = `
@@ -1208,11 +1219,17 @@ function renderProfile() {
           <span class="pi-label">ℹ️ About Prudent</span>
           <span class="pi-value" style="color:var(--gold)">›</span>
         </div>
+        ${!isPWA ? `
+          <div class="profile-info-item" onclick="testPWAMode()" style="cursor:pointer">
+            <span class="pi-label">🧪 Test PWA Mode</span>
+            <span class="pi-value" style="color:var(--blue-2)">›</span>
+          </div>
+        ` : ''}
       </div>
 
       <button class="logout-btn" onclick="doLogout()">🚪 Logout</button>
       
-      ${!isInstalledPWA() ? `
+      ${!isPWA ? `
         <div style="margin:16px 20px 0;padding:12px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);font-size:12px;color:var(--gold);text-align:center">
           🌐 Website Mode: You'll be automatically logged out when you close this tab or after 30 minutes of inactivity
         </div>
@@ -1221,9 +1238,29 @@ function renderProfile() {
           📱 App Mode: You'll stay logged in until you manually logout
         </div>
       `}
+      
+      <div style="margin:16px 20px 0;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-sm);font-size:11px;color:var(--text-3);text-align:center">
+        Debug: PWA Detection = ${isPWA ? 'TRUE' : 'FALSE'}
+      </div>
     </div>
     ${renderBottomNav()}
   `;
+}
+
+// Test function to simulate PWA mode
+function testPWAMode() {
+  // Temporarily override PWA detection for testing
+  window.testPWAMode = true;
+  showToast('🧪 PWA mode enabled for testing');
+  
+  // Re-initialize PWA features
+  initPWADownloadButton();
+  
+  // Re-render current screen
+  if (currentScreen === 'profile') {
+    renderProfile();
+    navigateScreen('profile');
+  }
 }
 
 function doLogout() {
@@ -1349,33 +1386,85 @@ let pwaInstallShown = false;
 
 // Check if app is running as installed PWA
 function isInstalledPWA() {
-  return window.matchMedia('(display-mode: standalone)').matches || 
-         window.navigator.standalone === true || 
-         document.referrer.includes('android-app://');
+  // Test mode override
+  if (window.testPWAMode) return true;
+  
+  // Multiple detection methods for better accuracy
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  const isIOSStandalone = window.navigator.standalone === true;
+  const isAndroidApp = document.referrer.includes('android-app://');
+  const isWindowsApp = window.location.protocol === 'ms-appx-web:';
+  const hasAppInstalled = window.matchMedia('(display-mode: fullscreen)').matches;
+  
+  // Check if running in TWA (Trusted Web Activity) - Android
+  const isTWA = window.location.search.includes('utm_source=homescreen') || 
+                window.location.search.includes('source=pwa');
+  
+  const detected = isStandalone || isIOSStandalone || isAndroidApp || isWindowsApp || hasAppInstalled || isTWA;
+  
+  // Debug logging (remove in production)
+  if (detected) {
+    console.log('PWA Detected:', {
+      standalone: isStandalone,
+      iOS: isIOSStandalone, 
+      android: isAndroidApp,
+      windows: isWindowsApp,
+      fullscreen: hasAppInstalled,
+      twa: isTWA
+    });
+  }
+  
+  return detected;
 }
 
 // Initialize PWA download button visibility
 function initPWADownloadButton() {
   const downloadBtn = document.getElementById('pwaDownloadBtn');
   const installModal = document.getElementById('pwaInstallModal');
+  const isPWA = isInstalledPWA();
   
-  if (isInstalledPWA()) {
+  console.log('Initializing PWA buttons - isPWA:', isPWA);
+  
+  if (isPWA) {
     // App is installed - hide all download/install UI completely
     if (downloadBtn) {
       downloadBtn.style.display = 'none';
       downloadBtn.classList.remove('show-for-website');
+      console.log('Hidden download button for PWA');
     }
     if (installModal) {
       installModal.classList.add('hide-for-installed');
+      console.log('Hidden install modal for PWA');
     }
   } else {
     // App is running in browser - show download button
     if (downloadBtn) {
       downloadBtn.classList.add('show-for-website');
+      console.log('Showing download button for website');
     }
     if (installModal) {
       installModal.classList.remove('hide-for-installed');
+      console.log('Showing install modal for website');
     }
+  }
+  
+  // Force header re-render to update button visibility
+  if (currentUser) {
+    const headerElements = document.querySelectorAll('.app-header');
+    headerElements.forEach(header => {
+      if (header.parentElement) {
+        const screenId = header.parentElement.id.replace('screen-', '');
+        if (screenId && typeof window[`render${screenId.charAt(0).toUpperCase() + screenId.slice(1)}`] === 'function') {
+          // Re-render the current screen to update header
+          setTimeout(() => {
+            if (currentScreen === screenId.replace('screen-', '')) {
+              const renderFunction = window[`render${screenId.charAt(0).toUpperCase() + screenId.slice(1)}`];
+              if (renderFunction) renderFunction();
+            }
+          }, 100);
+        }
+      }
+    });
   }
 }
 
