@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.env
+.DS_Store
+cordova-app/platforms/
+cordova-app/plugins/
+cordova-app/www/
+*.apk
+dist/

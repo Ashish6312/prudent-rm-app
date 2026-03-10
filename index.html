@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#F5A623" />
+    <title>Prudent MF – RM App</title>
+    <link rel="stylesheet" href="css/style.css" />
+    
+    <!-- Simple download logo in top corner -->
+    <style>
+        .download-logo {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            width: 40px;
+            height: 40px;
+            background: rgba(245, 166, 35, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #0B1F3A;
+            text-decoration: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(245, 166, 35, 0.3);
+            transition: all 0.3s ease;
+        }
+        .download-logo:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(245, 166, 35, 0.5);
+        }
+        .download-logo:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <!-- Simple Download Logo -->
+    <a href="/download-apk" class="download-logo" download title="Download Android APK">📥</a>
+
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="screen-login" class="screen active">
+            <div class="login-logo-wrap">
+                <img src="assets/logo.png" alt="Prudent Logo"
+                    style="width:100px;border-radius:16px;margin-bottom:14px;box-shadow:0 4px 20px rgba(245,166,35,0.4)"
+                    onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'">
+                <div id="logoFallback" class="login-logo-circle" style="display:none">P</div>
+                <div class="login-brand-name">Prudent MF</div>
+                <div class="login-brand-sub">RM FIELD APPLICATION</div>
+            </div>
+
+            <div class="login-form">
+                <div class="login-title">Welcome Back 👋</div>
+                <div class="login-subtitle">Sign in to your RM account</div>
+
+                <div class="form-group">
+                    <label class="form-label" for="empId">Employee ID</label>
+                    <input class="form-control" id="empId" type="text" placeholder="e.g. PMF1042" autocomplete="off" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input class="form-control" id="password" type="password" placeholder="Enter password" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="roleSelect">Login As</label>
+                    <select class="form-control" id="roleSelect">
+                        <option value="RM">Relationship Manager (RM)</option>
+                        <option value="Senior RM">Senior RM</option>
+                        <option value="Area Manager">Area Manager</option>
+                    </select>
+                </div>
+
+                <button class="btn-login" id="loginBtn" onclick="doLogin()">Sign In →</button>
+
+                <div class="login-hint">
+                    Demo: ID <strong>PMF1042</strong> | Pass <strong>1234</strong> | Role <strong>RM</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Other screens remain the same -->
+        <div id="screen-dashboard" class="screen"></div>
+        <div id="screen-partners" class="screen"></div>
+        <div id="screen-cpdetail" class="screen"></div>
+        <div id="screen-reports" class="screen"></div>
+        <div id="screen-reportdetail" class="screen"></div>
+        <div id="screen-hierarchy" class="screen"></div>
+        <div id="screen-calllog" class="screen"></div>
+        <div id="screen-notifications" class="screen"></div>
+        <div id="screen-tasks" class="screen"></div>
+        <div id="screen-profile" class="screen"></div>
+        <div id="screen-about" class="screen"></div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="addCallModal" onclick="if(event.target===this)closeModal('addCallModal')">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">📞 Log a Call</div>
+                <div class="modal-close" onclick="closeModal('addCallModal')">✕</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Channel Partner</label>
+                <input class="form-control" id="callCPName" type="text" placeholder="CP name…" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Date & Time</label>
+                <input class="form-control" id="callDate" type="datetime-local" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Outcome</label>
+                <select class="form-control" id="callOutcome">
+                    <option value="Positive">✅ Positive</option>
+                    <option value="Neutral">🔘 Neutral</option>
+                    <option value="Negative">❌ Negative</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" id="callNotes" rows="3" placeholder="What was discussed? Next steps?"
+                    style="resize:none;line-height:1.5"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Next Follow-up</label>
+                <input class="form-control" id="followUpDate" type="date" />
+            </div>
+            <button class="btn-primary" onclick="saveCallLog()">Save Call Log</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="addTaskModal" onclick="if(event.target===this)closeModal('addTaskModal')">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">✅ Set Task / Reminder</div>
+                <div class="modal-close" onclick="closeModal('addTaskModal')">✕</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Task Title *</label>
+                <input class="form-control" id="taskTitle" type="text" placeholder="What needs to be done?" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Channel Partner</label>
+                <input class="form-control" id="taskCPName" type="text" placeholder="CP name (optional)" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div class="form-group">
+                    <label class="form-label">Task Type</label>
+                    <select class="form-control" id="taskType">
+                        <option>Call</option>
+                        <option>Meeting</option>
+                        <option>Follow-up</option>
+                        <option>Document</option>
+                        <option>Review</option>
+                        <option>Task</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select class="form-control" id="taskPriority">
+                        <option>High</option>
+                        <option selected>Medium</option>
+                        <option>Low</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div class="form-group">
+                    <label class="form-label">Due Date *</label>
+                    <input class="form-control" id="taskDueDate" type="date" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Due Time</label>
+                    <input class="form-control" id="taskDueTime" type="time" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Reminder</label>
+                <select class="form-control" id="taskReminder">
+                    <option>15 mins before</option>
+                    <option selected>30 mins before</option>
+                    <option>1 hour before</option>
+                    <option>2 hours before</option>
+                    <option>1 day before</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" id="taskNotes" rows="2" placeholder="Additional context…"
+                    style="resize:none;line-height:1.5"></textarea>
+            </div>
+            <button class="btn-primary" onclick="saveTask()">💾 Save Task</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

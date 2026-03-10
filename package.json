@@ -1,0 +1,19 @@
+{
+  "name": "prudent-rm-app",
+  "version": "1.0.0",
+  "description": "Prudent MF Relationship Manager PWA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'No build needed for static PWA'"
+  },
+  "keywords": ["prudent", "rm", "pwa"],
+  "author": "Prudent MF Team",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
