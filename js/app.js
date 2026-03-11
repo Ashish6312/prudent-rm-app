@@ -240,32 +240,25 @@ function initPWAFeatures() {
   // Initialize download button visibility
   initPWADownloadButton();
   
-  // Set up aggressive periodic check to ensure PWA elements stay hidden
+  // Set up VERY aggressive periodic check to ensure PWA elements stay hidden
   if (isInstalledPWA()) {
-    const hideInstallElements = () => {
-      // Hide main PWA elements
+    const aggressiveHideInstallElements = () => {
+      // Remove main PWA elements completely
       const downloadBtn = document.getElementById('pwaDownloadBtn');
       const installModal = document.getElementById('pwaInstallModal');
       
       if (downloadBtn) {
-        downloadBtn.style.display = 'none !important';
-        downloadBtn.style.visibility = 'hidden !important';
-        downloadBtn.style.opacity = '0 !important';
-        downloadBtn.classList.add('hidden-for-pwa');
-        downloadBtn.remove(); // Remove from DOM
+        downloadBtn.parentNode?.removeChild(downloadBtn);
       }
       
       if (installModal) {
-        installModal.style.display = 'none !important';
-        installModal.style.visibility = 'hidden !important';
-        installModal.style.opacity = '0 !important';
-        installModal.classList.add('hide-for-installed');
-        installModal.remove(); // Remove from DOM
+        installModal.parentNode?.removeChild(installModal);
       }
       
-      // Hide any install buttons that might appear anywhere
+      // Aggressively find and remove any install-related elements
       const installSelectors = [
-        '[title="Install App"]',
+        '[title*="Install"]',
+        '[title*="install"]',
         '[onclick*="install"]',
         '[onclick*="Install"]',
         '[data-install]',
@@ -274,33 +267,36 @@ function initPWAFeatures() {
         '.add-to-homescreen',
         '.browser-install-prompt',
         '[aria-label*="install"]',
-        '[aria-label*="Install"]',
-        'button:contains("Install")',
-        'button:contains("📥")',
-        '[href*="install"]'
+        '[aria-label*="Install"]'
       ];
       
       installSelectors.forEach(selector => {
         try {
           const elements = document.querySelectorAll(selector);
           elements.forEach(el => {
-            const text = el.textContent || el.innerText || '';
-            const title = el.title || '';
-            const ariaLabel = el.getAttribute('aria-label') || '';
+            const text = (el.textContent || '').toLowerCase();
+            const title = (el.title || '').toLowerCase();
+            const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+            const onclick = (el.getAttribute('onclick') || '').toLowerCase();
             
             if (text.includes('📥') || 
-                text.toLowerCase().includes('install') ||
-                title.toLowerCase().includes('install') ||
-                ariaLabel.toLowerCase().includes('install')) {
-              el.style.display = 'none !important';
-              el.style.visibility = 'hidden !important';
-              el.style.opacity = '0 !important';
-              el.style.pointerEvents = 'none !important';
-              el.remove(); // Remove from DOM
+                text.includes('install') ||
+                title.includes('install') ||
+                ariaLabel.includes('install') ||
+                onclick.includes('install')) {
+              el.parentNode?.removeChild(el);
             }
           });
         } catch (e) {
           // Ignore selector errors
+        }
+      });
+      
+      // Also remove any elements with download emoji
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach(el => {
+        if (el.textContent === '📥' || el.innerHTML === '📥') {
+          el.parentNode?.removeChild(el);
         }
       });
       
@@ -309,17 +305,19 @@ function initPWAFeatures() {
       document.documentElement.classList.add('pwa-mode');
     };
     
-    // Run immediately and then every second
-    hideInstallElements();
-    setInterval(hideInstallElements, 1000);
+    // Run immediately and then every 500ms for aggressive cleanup
+    aggressiveHideInstallElements();
+    setInterval(aggressiveHideInstallElements, 500);
     
-    // Also run on DOM mutations
-    const observer = new MutationObserver(hideInstallElements);
+    // Also run on any DOM changes
+    const observer = new MutationObserver(() => {
+      setTimeout(aggressiveHideInstallElements, 10);
+    });
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['style', 'class']
+      attributeFilter: ['style', 'class', 'onclick', 'title']
     });
   }
   
@@ -1428,7 +1426,7 @@ function renderHeader(title = '') {
           <div class="header-icon-btn" onclick="showPWAInstallModal()" title="Install App">
             📥
           </div>
-          <div class="header-icon-btn" onclick="window.open('https://prudent-rm-app.onrender.com', '_blank')" title="Share App">
+          <div class="header-icon-btn" onclick="shareApp()" title="Share App">
             📤
           </div>
         ` : ''}
@@ -1558,22 +1556,28 @@ function initPWADownloadButton() {
     document.body.classList.add('pwa-mode');
     document.documentElement.classList.add('pwa-mode');
     
-    // App is installed - hide all download/install UI completely
+    // App is installed - COMPLETELY REMOVE all download/install UI
     if (downloadBtn) {
       downloadBtn.style.display = 'none !important';
-      downloadBtn.classList.remove('show-for-website');
+      downloadBtn.style.visibility = 'hidden !important';
+      downloadBtn.style.opacity = '0 !important';
+      downloadBtn.style.pointerEvents = 'none !important';
       downloadBtn.classList.add('hidden-for-pwa');
-      downloadBtn.remove(); // Completely remove from DOM
-      console.log('Hidden and removed download button for PWA');
-    }
-    if (installModal) {
-      installModal.style.display = 'none !important';
-      installModal.classList.add('hide-for-installed');
-      installModal.remove(); // Completely remove from DOM
-      console.log('Hidden and removed install modal for PWA');
+      downloadBtn.parentNode?.removeChild(downloadBtn); // Remove from DOM completely
+      console.log('Completely removed download button for PWA');
     }
     
-    // Hide any other install-related elements
+    if (installModal) {
+      installModal.style.display = 'none !important';
+      installModal.style.visibility = 'hidden !important';
+      installModal.style.opacity = '0 !important';
+      installModal.style.pointerEvents = 'none !important';
+      installModal.classList.add('hide-for-installed');
+      installModal.parentNode?.removeChild(installModal); // Remove from DOM completely
+      console.log('Completely removed install modal for PWA');
+    }
+    
+    // Aggressively hide any other install-related elements
     const installSelectors = [
       '[title="Install App"]',
       '[onclick*="showPWAInstallModal"]',
@@ -1590,40 +1594,52 @@ function initPWADownloadButton() {
     installSelectors.forEach(selector => {
       const elements = document.querySelectorAll(selector);
       elements.forEach(el => {
-        if (el.textContent.includes('📥') || 
-            el.title === 'Install App' || 
-            el.getAttribute('onclick')?.includes('install')) {
+        const text = (el.textContent || '').toLowerCase();
+        const title = (el.title || '').toLowerCase();
+        const onclick = (el.getAttribute('onclick') || '').toLowerCase();
+        
+        if (text.includes('📥') || 
+            text.includes('install') ||
+            title.includes('install') ||
+            onclick.includes('install')) {
           el.style.display = 'none !important';
           el.style.visibility = 'hidden !important';
           el.style.opacity = '0 !important';
           el.style.pointerEvents = 'none !important';
-          el.remove(); // Remove from DOM
-          console.log('Hidden install element:', el);
+          el.parentNode?.removeChild(el); // Remove from DOM
+          console.log('Removed install element:', el);
         }
       });
     });
     
-    // Prevent browser install prompts
+    // Prevent any browser install prompts
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
       return false;
-    });
+    }, true);
     
   } else {
     // Remove PWA mode class
     document.body.classList.remove('pwa-mode');
     document.documentElement.classList.remove('pwa-mode');
     
-    // App is running in browser - show download button
+    // App is running in browser - show download and share buttons
     if (downloadBtn) {
       downloadBtn.style.display = '';
+      downloadBtn.style.visibility = '';
+      downloadBtn.style.opacity = '';
+      downloadBtn.style.pointerEvents = '';
       downloadBtn.classList.add('show-for-website');
       downloadBtn.classList.remove('hidden-for-pwa');
       console.log('Showing download button for website');
     }
     if (installModal) {
       installModal.style.display = '';
+      installModal.style.visibility = '';
+      installModal.style.opacity = '';
+      installModal.style.pointerEvents = '';
       installModal.classList.remove('hide-for-installed');
       console.log('Showing install modal for website');
     }
@@ -1632,19 +1648,17 @@ function initPWADownloadButton() {
   // Force header re-render to update button visibility
   if (currentUser) {
     setTimeout(() => {
-      // Re-render all screens to update headers
-      if (typeof renderDashboard === 'function') renderDashboard();
-      if (typeof renderCPList === 'function') renderCPList();
-      if (typeof renderReports === 'function') renderReports();
-      if (typeof renderHierarchy === 'function') renderHierarchy();
-      if (typeof renderCallLog === 'function') renderCallLog();
-      if (typeof renderNotifications === 'function') renderNotifications();
-      if (typeof renderProfile === 'function') renderProfile();
-      if (typeof renderTasks === 'function') renderTasks();
-      
-      // Navigate to current screen to refresh
-      navigateScreen(currentScreen);
-    }, 200);
+      // Re-render current screen to update header
+      const currentScreenElement = document.querySelector('.screen.active');
+      if (currentScreenElement) {
+        const screenId = currentScreenElement.id.replace('screen-', '');
+        const renderFunction = window[`render${screenId.charAt(0).toUpperCase() + screenId.slice(1)}`];
+        if (renderFunction) {
+          renderFunction();
+          navigateScreen(screenId);
+        }
+      }
+    }, 100);
   }
 }
 
@@ -1742,5 +1756,49 @@ function installPWA() {
   // Only show install modal if not already installed
   if (!isInstalledPWA()) {
     showPWAInstallModal();
+  }
+}
+
+// Share app functionality
+function shareApp() {
+  const shareData = {
+    title: 'Prudent MF - RM App',
+    text: 'Check out this professional RM app for Prudent Mutual Fund!',
+    url: 'https://prudent-rm-app.onrender.com'
+  };
+
+  // Check if Web Share API is supported
+  if (navigator.share) {
+    navigator.share(shareData)
+      .then(() => showToast('📤 App shared successfully!'))
+      .catch((error) => {
+        console.log('Error sharing:', error);
+        fallbackShare();
+      });
+  } else {
+    // Fallback for browsers that don't support Web Share API
+    fallbackShare();
+  }
+}
+
+function fallbackShare() {
+  const url = 'https://prudent-rm-app.onrender.com';
+  const text = 'Check out Prudent MF RM App - Professional relationship manager tool!';
+  
+  // Try to copy to clipboard
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(`${text} ${url}`)
+      .then(() => {
+        showToast('📋 App link copied to clipboard!');
+      })
+      .catch(() => {
+        // If clipboard fails, open in new tab
+        window.open(url, '_blank');
+        showToast('📤 App opened in new tab');
+      });
+  } else {
+    // Last resort - open in new tab
+    window.open(url, '_blank');
+    showToast('📤 App opened in new tab');
   }
 }
